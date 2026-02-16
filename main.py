@@ -1,16 +1,25 @@
 import socket
 import logging
 import sys
+import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
+
 
 DEFAULT_TIMEOUT = 1
 DEFAULT_THREADS = 100
 
 
-# ==============================
-# Logging Setup
-# ==============================
+GREEN = "\033[92m"
+RED = "\033[91m"
+YELLOW = "\033[93m"
+CYAN = "\033[96m"
+RESET = "\033[0m"
+
+lock = threading.Lock()
+
+
+
 
 def setup_logging():
     logging.basicConfig(
@@ -20,9 +29,7 @@ def setup_logging():
     )
 
 
-# ==============================
-# Port Scanner Function
-# ==============================
+
 
 def scan_port(host, port, timeout):
     try:
@@ -37,13 +44,11 @@ def scan_port(host, port, timeout):
 
     except socket.timeout:
         return port, "TIMEOUT"
-    except Exception as e:
-        return port, f"ERROR"
+    except:
+        return port, "ERROR"
 
 
-# ==============================
-# Validation
-# ==============================
+
 
 def validate_ports(start_port, end_port):
     if start_port < 1 or end_port > 65535:
@@ -55,17 +60,15 @@ def validate_ports(start_port, end_port):
         sys.exit(1)
 
 
-# ==============================
-# Main
-# ==============================
+
 
 def main():
 
     print("=" * 60)
-    print("🚀 FalconStrix TCP Port Scanner")
+    print(f"{CYAN}🚀 FalconStrix Advanced TCP Port Scanner{RESET}")
     print("=" * 60)
 
-    # Take user input
+    # User Input
     host = input("Enter Target Host (IP or Domain): ").strip()
 
     try:
@@ -93,6 +96,13 @@ def main():
 
     start_time = datetime.now()
 
+    total_ports = end_port - start_port + 1
+    scanned = 0
+
+    open_ports = 0
+    closed_ports = 0
+    timeout_ports = 0
+
     try:
         with ThreadPoolExecutor(max_workers=threads) as executor:
             futures = {
@@ -103,16 +113,28 @@ def main():
             for future in as_completed(futures):
                 port, status = future.result()
 
-                if status == "OPEN":
-                    print(f"[+] Port {port:5} OPEN")
-                elif status == "CLOSED":
-                    print(f"[-] Port {port:5} CLOSED")
-                elif status == "TIMEOUT":
-                    print(f"[!] Port {port:5} TIMEOUT")
-                else:
-                    print(f"[x] Port {port:5} {status}")
+                with lock:
+                    scanned += 1
+                    progress = (scanned / total_ports) * 100
 
-                logging.info(f"{host}:{port} - {status}")
+                    if status == "OPEN":
+                        print(f"{GREEN}[+] Port {port:5} OPEN{RESET}")
+                        open_ports += 1
+
+                    elif status == "CLOSED":
+                        print(f"{RED}[-] Port {port:5} CLOSED{RESET}")
+                        closed_ports += 1
+
+                    elif status == "TIMEOUT":
+                        print(f"{YELLOW}[!] Port {port:5} TIMEOUT{RESET}")
+                        timeout_ports += 1
+
+                    else:
+                        print(f"[x] Port {port:5} ERROR")
+
+                    logging.info(f"{host}:{port} - {status}")
+
+                    print(f"{CYAN}Progress: {progress:.2f}%{RESET}")
 
     except KeyboardInterrupt:
         print("\n⚠️ Scan interrupted by user.")
@@ -120,10 +142,16 @@ def main():
 
     end_time = datetime.now()
 
-    print("-" * 60)
-    print("✅ Scan Completed")
-    print(f"Finished at : {end_time}")
-    print(f"Duration    : {end_time - start_time}")
+
+
+    print("\n" + "=" * 60)
+    print(f"{CYAN}✅ Scan Completed{RESET}")
+    print("=" * 60)
+    print(f"Target Host   : {host}")
+    print(f"Open Ports    : {open_ports}")
+    print(f"Closed Ports  : {closed_ports}")
+    print(f"Timeout Ports : {timeout_ports}")
+    print(f"Duration      : {end_time - start_time}")
     print("=" * 60)
 
 
